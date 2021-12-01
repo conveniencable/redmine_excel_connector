@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="UTF-8"/>
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+        <title>Redmien Excel Connector</title>
+    </head>
+    <body>
+        <div id="root"></div>
+        
+
+        
+
+        <% if User.current.logged?
+        %>
+            <script>
+            var RX__CurrentUser = <%=current_user.to_json.html_safe%>;
+            </script>
+        <%
+        end
+        %>
+
+    <script>
+        var RX__LANG = <%={
+            :login => l(:label_login), 
+            :logout => l(:label_logout),
+            :project => l(:label_project),
+            :projects => l(:label_project_plural),
+            :label_filter_plural => l(:label_filter_plural),
+            :query => l(:label_query),
+            :day_plural => l(:label_day_plural),
+            :field_column_names => l(:field_column_names),
+            :button_apply => l(:button_apply),
+            :button_save => l(:button_save),
+            :label_project_all => l(:label_project_all)
+        }.to_json.html_safe%>;
+    </script>
+
+    <script src="/js/bundle.min.js"></script></body>
+</html>
