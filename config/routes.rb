@@ -6,5 +6,6 @@ get '/redmine_excel_connector/api/query_settings' => 'redmine_excel_connector#qu
 get '/redmine_excel_connector/api/queries' => 'redmine_excel_connector#queries'
 get '/redmine_excel_connector/api/filter_values' => 'redmine_excel_connector#filter_values'
 get '/redmine_excel_connector/api/issues' => 'redmine_excel_connector#issues'
+post '/redmine_excel_connector/api/issues' => 'redmine_excel_connector#save_issues'
 
 get '/redmine_excel_connector/*react_path' => 'redmine_excel_connector#index'

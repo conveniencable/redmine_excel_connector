@@ -1,5 +1,5 @@
 module RedmineExcelConnectorHelper
-  @@field_formats = { 'id': 'int', 'start_date': 'date', 'due_date': 'date', 'done_ratio': 'int', 'is_private': 'bool', 'estimated_hours': 'float', 'created_on': 'date', 'updated_on': 'date', 'closed_on': 'date', 'spent_hours': 'float', 'total_spent_hours': 'float' }
+  @@used_sym = ({ :value => true }.delete('value') == true)
 
   def cors
     if Rails.env.development?
@@ -35,7 +35,7 @@ module RedmineExcelConnectorHelper
 
   def find_project_members
     User.active.all.map do |user|
-      {:id => user.id, :name => user.name, project_ids => user.members.map(&:project_id)}
+      { :id => user.id, :name => user.name, project_ids => user.members.map(&:project_id) }
     end
   end
 
@@ -43,13 +43,13 @@ module RedmineExcelConnectorHelper
     projects = []
     currentUser = User.current
     index = 0
-    Project.project_tree(Project.visible.active.select{|p| currentUser.allowed_to?(:view_issues, p)}) do |project, level|
+    Project.project_tree(Project.visible.active.select { |p| currentUser.allowed_to?(:view_issues, p) }) do |project, level|
       projects << {
         :id => project.id, :name => project.name, :level => level,
-        :permission_add_issues =>  currentUser.allowed_to?(:add_issues, p),
-        :permission_edit_issues =>  currentUser.allowed_to?(:edit_issues, p),
-        :permission_edit_own_issues =>  currentUser.allowed_to?(:edit_own_issues, p),
-        :permission_delete_issues =>  currentUser.allowed_to?(:delete_issues, p),
+        :permission_add_issues => currentUser.allowed_to?(:add_issues, p),
+        :permission_edit_issues => currentUser.allowed_to?(:edit_issues, p),
+        :permission_edit_own_issues => currentUser.allowed_to?(:edit_own_issues, p),
+        :permission_delete_issues => currentUser.allowed_to?(:delete_issues, p),
         :index => index
       }
       index += 1
@@ -58,15 +58,15 @@ module RedmineExcelConnectorHelper
   end
 
   def json_invalid(fieldErrors)
-    {:code => 500, :data => fieldErrors}
+    { :code => 500, :data => fieldErrors }
   end
 
   def json_error(error)
-    {:code => 600, :data => error}
+    { :code => 600, :data => error }
   end
 
   def json_ok(data = {})
-    {:code => 0, :data => data}
+    { :code => 0, :data => data }
   end
 
   def query_filters(query)
@@ -113,43 +113,196 @@ module RedmineExcelConnectorHelper
 
   def to_query_data(query)
     {
-      :id => query.id, 
-      :name => query.name, 
-      :columns => (query.inline_columns & query.available_inline_columns).reject(&:frozen?).collect{|column| column.name},
-      :filters => query.filters.collect{|f| {:fieldName => f[0], :operator => f[1][:operator], :values => f[1][:values]} }
+      :id => query.id,
+      :name => query.name,
+      :columns => (query.inline_columns & query.available_inline_columns).reject(&:frozen?).collect { |column| column.name },
+      :filters => query.filters.collect { |f| { :fieldName => f[0], :operator => f[1][:operator], :values => f[1][:values] } }
     }
   end
 
   def field_settings()
     common_fields = []
-    common_fields << {:label => '#', :name => 'id', :type => 'integer'}
-    common_fields << {:label => '$', :name => 'row_id', :type => 'string'}
-    common_fields << {:label => l(:field_project), :name => 'project_id', :type => 'string', :config_objects => Project}
-    common_fields << {:label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer'}
-    common_fields << {:label => l(:field_subject), :name => 'subject', :type => 'string'}
-    common_fields << {:label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :config_objects => Tracker}
-    common_fields << {:label => l(:field_status), :name => 'status', :key => 'status_id', :type => 'string', :possible_objects => IssueStatus.all.map{|i| {:id => i.id, :name => i.name}}}
-    common_fields << {:label => l(:field_priority), :name => 'priority', :key => 'priority_id', :type => 'string', :possible_objects => IssuePriority.all.map{|i| {:id => i.id, :name => i.name}}}
-    common_fields << {:label => l(:field_assigned_to), :name => 'assigned_to', :key => 'assigned_to_id', :type => 'string', :config_objects => User}
-    common_fields << {:label => l(:field_category), :name => 'category', :key => 'category_id', :type => 'string', :config_objects => IssueCategory}
+    common_fields << { :label => '#', :name => 'id', :type => 'integer' }
+    common_fields << { :label => '$', :name => 'row_id', :type => 'string', :readonly => true }
+    common_fields << { :label => l(:field_project), :name => 'project_id', :type => 'string', :config_objects => Project }
+    common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer' }
+    common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
+    common_fields << { :label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :config_objects => Tracker }
+    common_fields << { :label => l(:field_status), :name => 'status', :key => 'status_id', :type => 'string', :possible_objects => IssueStatus.all.map { |i| { :id => i.id, :name => i.name } } }
+    common_fields << { :label => l(:field_priority), :name => 'priority', :key => 'priority_id', :type => 'string', :possible_objects => IssuePriority.all.map { |i| { :id => i.id, :name => i.name } } }
+    common_fields << { :label => l(:field_assigned_to), :name => 'assigned_to', :key => 'assigned_to_id', :type => 'string', :config_objects => User }
+    common_fields << { :label => l(:field_category), :name => 'category', :key => 'category_id', :type => 'string', :config_objects => IssueCategory }
 
-    common_fields << {:label => l(:field_start_date), :name => 'start_date', :type => 'date'}
-    common_fields << {:label => l(:field_due_date), :name => 'due_date', :type => 'date'}
-    common_fields << {:label => l(:field_estimated_hours), :name => 'estimated_hours', :type => 'double'}
-    common_fields << {:label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer', :posibble_values => (0..10).to_a.collect {|r| {:name => "#{r*10}%", :id => r*10 }}}
-    common_fields << {:label => l(:label_description), :name => 'description', :type => 'string'}
+    common_fields << { :label => l(:field_start_date), :name => 'start_date', :type => 'date' }
+    common_fields << { :label => l(:field_due_date), :name => 'due_date', :type => 'date' }
+    common_fields << { :label => l(:field_estimated_hours), :name => 'estimated_hours', :type => 'float' }
+    common_fields << { :label => l(:field_total_estimated_hours), :name => 'total_estimated_hours', :type => 'float' }
+    common_fields << { :label => l(:label_spent_time), :name => 'spent_hours', :type => 'float', :readonly => true }
+    common_fields << { :label => l(:label_total_spent_time), :name => 'total_spent_hours', :type => 'float', :readonly => true }
+    common_fields << { :label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer', :possible_values => (0..10).to_a.collect { |r| { :name => "#{r * 10}%", :id => r * 10 } } }
+    common_fields << { :label => l(:label_description), :name => 'description', :type => 'string' }
 
-    relation_types = IssueRelation::TYPES
-    relation_types_list = relation_types.keys.sort{|x,y| relation_types[x][:order] <=> relation_types[y][:order]}.collect{|k| {:name => l(relation_types[k][:name]), :id => k}}
+    common_fields << { :label => l(:field_is_private), :name => 'is_private', :type => 'bool' }
+    common_fields << { :label => l(:field_created_on), :name => 'created_on', :type => 'datetime', :readonly => true }
+    common_fields << { :label => l(:field_updated_on), :name => 'updated_on', :type => 'datetime', :readonly => true }
+    common_fields << { :label => l(:field_closed_on), :name => 'closed_on', :type => 'datetime', :readonly => true }
+    common_fields << { :label => l(:field_author), :name => 'author', :type => 'string', :readonly => true }
+    common_fields << { :label => l(:field_last_updated_by), :name => 'last_updated_by', :type => 'string', :readonly => true }
 
-    common_fields << {:label => l(:label_related_issues), :name => 'relations', :type => 'string', :possible_objects => relation_types_list}
+    common_fields << { :label => l(:label_related_issues), :name => 'relations', :type => 'string', :relation_types => relation_types_list }
     #common_fields << {:name => l(:label_attachment), :name => 'attachment', :type => 'string'}
 
-    @custom_fields = CustomField.all().map do |cf|
-      {:label => cf.name, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.possible_values}
+    custom_fields = CustomField.all().map do |cf|
+      { :label => cf.name, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.possible_values }
     end
-  
 
-    [common_fields, @custom_fields].reduce([], :concat)
+    [common_fields, custom_fields].reduce([], :concat)
+  end
+
+  def relation_types_list
+    relation_types = IssueRelation::TYPES
+    relation_types.keys.sort { |x, y| relation_types[x][:order] <=> relation_types[y][:order] }.collect { |k| { :name => l(relation_types[k][:name]), :id => k } }
+  end
+
+  def load_field_setting_getter(field_settings)
+    field_settings.each do |field_setting|
+      if field_setting
+        if field_setting[:config_objects]
+          field_setting[:possible_objects] = field_setting[:config_objects].all().map { |v| { :id => v.id, :name => v.name } }
+        end
+      end
+    end
+  end
+
+  def parse_field_value(issue_data, field_value, field_setting)
+    value = nil
+    unless field_value.nil?
+      if field_setting[:name] == 'relations'
+        relation_values = []
+        field_value.split(/\r?\n/).each do |relation_value|
+          match_data = /(\S+)\s+([#\$]\d+)/.match(relation_value)
+          if match_data
+            relation_type_name = match_data[1]
+            to_id = match_data[2]
+
+            relation_type = field_setting[:relation_types].find { |rt| rt[:name] == relation_type_name }
+
+            if relation_type
+              relation_value << { :relation_type => relation_type[:id] }
+              if to_id.start_with?('#')
+                relation_value[:to_id] = to_id.to_i
+              elsif to_id.start_with?('$')
+                relation_value[:to_row_id] = to_id[1..-1]
+              end
+
+              relation_values << relation_value
+            end
+          else
+            match_data = /(\S+)\s+\((\d+)\)\s+([#\$]\d+)/.match(relation_value)
+            if match_data
+              relation_type_name = match_data[1]
+              delay_day = match_data[2]
+              to_id = match_data[3]
+
+              relation_type = field_setting[:relation_types].find { |rt| rt[:name] == relation_type_name }
+              if relation_type
+                relation_value = { :relation_type => relation_type[:id], :delay => delay_day.to_i }
+                if to_id.start_with?('#')
+                  relation_value[:to_id] = to_id.to_i
+                elsif to_id.start_with?('$')
+                  relation_value[:to_row_id] = to_id[1..-1]
+                end
+                relation_values << relation_value
+              end
+            end
+          end
+        end
+
+        unless relation_values.empty?
+          value = relation_values
+        end
+      elsif field_setting[:possible_objects].present?
+        value = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
+      else
+        value = field_value
+      end
+    end
+
+    unless value.nil?
+      if field_setting[:name].start_with? 'cf_'
+        if issue_data[:custom_field_values].present?
+          custom_field_values = issue_data[:custom_field_values]
+        else
+          custom_field_values = {}
+          issue_data[:custom_field_values] = custom_field_values
+        end
+        custom_field_values[field_setting[:name][3..-1].to_i] = value
+      else
+        if field_setting[:key]
+          issue_data[field_setting[:key]] = value
+        else
+          issue_data[field_setting[:name]] = value
+        end
+      end
+    end
+  end
+
+  def convert_issue_data(issue_data)
+    unless @@used_sym
+      issue_data2 = {}
+      issue_data.each_pair do |key, value|
+        issue_data2[key.to_s] = value
+      end
+
+      issue_data = issue_data2
+    end
+
+    return issue_data
+  end
+
+  def save_relation(relation_data)
+    reverse_relation_if_needed(relation_data)
+
+    relation = IssueRelation.where(:issue_from_id => relation_data[:from_id], :issue_to_id => relation_data[:to_id]).first
+
+    if relation
+      return relation if relation.relation_type == relation_data[:relation_type] && relation.delay == relation_data[:delay]
+
+      relation.delay = relation_data[:delay]
+      relation.relation_type = relation_data[:relation_type]
+
+      relation.save
+    else
+      relation = IssueRelation.new
+      relation.issue_from_id = relation_data[:from_id]
+      relation.issue_to_id = relation_data[:to_id]
+      relation.relation_type = relation_data[:relation_type]
+      relation.delay = relation_data[:delay]
+
+      relation.save
+    end
+
+    relation
+  end
+
+  def reverse_relation_if_needed(relation_data)
+    relation_type = relation_data[:relation_type]
+    if IssueRelation::TYPES.has_key?(relation_type) && IssueRelation::TYPES[relation_type][:reverse]
+      tmp_to_id = relation_data[:to_id]
+      relation_data[:to_id] = relation_data[:from_id]
+      relation_data[:from_id] = tmp_to_id
+      relation_data[:relation_type] = IssueRelation::TYPES[relation_type][:reverse]
+
+    elsif relation_type == IssueRelation::TYPE_RELATES && relation_data[:from_id] > relation_data[:to_id]
+      tmp_to_id = relation_data[:to_id]
+      relation_data[:to_id] = relation_data[:from_id]
+      relation_data[:from_id] = tmp_to_id
+    end
+  end
+
+  def add_to_errors(errors, line_no, data)
+    errors[line_no] = [] unless errors[line_no]
+
+    errors[line_no] += data
   end
 end
