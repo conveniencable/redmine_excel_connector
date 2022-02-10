@@ -1,5 +1,6 @@
 module RedmineExcelConnectorHelper
   @@used_sym = ({ :value => true }.delete('value') == true)
+  @@NULL_STR = '$_nu^ll_#'
 
   def cors
     if Rails.env.development?
@@ -124,7 +125,7 @@ module RedmineExcelConnectorHelper
     common_fields = []
     common_fields << { :label => '#', :name => 'id', :type => 'integer' }
     common_fields << { :label => '$', :name => 'row_id', :type => 'string', :readonly => true }
-    common_fields << { :label => l(:field_project), :name => 'project_id', :type => 'string', :config_objects => Project }
+    common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :config_objects => Project }
     common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer' }
     common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
     common_fields << { :label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :config_objects => Tracker }
@@ -176,7 +177,7 @@ module RedmineExcelConnectorHelper
 
   def parse_field_value(issue_data, field_value, field_setting)
     value = nil
-    unless field_value.nil?
+    if (not field_value.nil?) && field_value != @@NULL_STR
       if field_setting[:name] == 'relations'
         relation_values = []
         field_value.split(/\r?\n/).each do |relation_value|
@@ -223,26 +224,33 @@ module RedmineExcelConnectorHelper
         end
       elsif field_setting[:possible_objects].present?
         value = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
+        if value
+          value = value[:id]
+        end
       else
         value = field_value
       end
     end
 
-    unless value.nil?
-      if field_setting[:name].start_with? 'cf_'
-        if issue_data[:custom_field_values].present?
-          custom_field_values = issue_data[:custom_field_values]
-        else
-          custom_field_values = {}
-          issue_data[:custom_field_values] = custom_field_values
-        end
-        custom_field_values[field_setting[:name][3..-1].to_i] = value
+    if value
+      if field_setting[:type] == 'date' or field_setting[:type] == 'datetime'
+        value = parse_oa_date(value)
+      end
+    end
+
+    if field_setting[:name].start_with? 'cf_'
+      if issue_data[:custom_field_values].present?
+        custom_field_values = issue_data[:custom_field_values]
       else
-        if field_setting[:key]
-          issue_data[field_setting[:key]] = value
-        else
-          issue_data[field_setting[:name]] = value
-        end
+        custom_field_values = {}
+        issue_data[:custom_field_values] = custom_field_values
+      end
+      custom_field_values[field_setting[:name][3..-1].to_i] = value
+    else
+      if field_setting[:key]
+        issue_data[field_setting[:key].to_sym] = value
+      else
+        issue_data[field_setting[:name].to_sym] = value
       end
     end
   end
@@ -258,6 +266,10 @@ module RedmineExcelConnectorHelper
     end
 
     return issue_data
+  end
+
+  def parse_oa_date(val)
+    Time.at((val.to_i - 25569) * 24 * 3600)
   end
 
   def save_relation(relation_data)

@@ -157,14 +157,14 @@ class RedmineExcelConnectorController < ApplicationController
     unknown_parent_row_id_to_id = params[:unknown_parent_row_id_to_id]
 
     header_settings = []
-    params[:headers].each do |label|
-      field_setting = fields.find{|fs| fs[:label] == label}
-      if field_setting[:readonly]
+    params[:headers].each do |field_name|
+      field_setting = fields.find{|fs| fs[:name] == field_name}
+      unless field_setting[:readonly]
         if field_setting.present?
           header_settings << field_setting
         else
           header_settings << nil
-          logger.info("can't find field setting for label '#{label}'") if logger
+          logger.info("can't find field setting for name='#{field_name}'") if logger
         end
       else
         header_settings << nil
@@ -184,13 +184,17 @@ class RedmineExcelConnectorController < ApplicationController
     all_relations = []
 
     params[:issues].each do |issue_array_data|
+      if issue_array_data.length <= 1
+        next
+      end
+
       line_no = issue_array_data[0].to_i
       issue_data = {:line_no => line_no}
       issue_datas << issue_data
 
       header_settings.each_with_index do |field_setting, field_index|
-        if field_index > 0 && field_setting
-          parse_field_value(issue_data, issue_array_data[field_index], field_setting)
+        if field_setting
+          parse_field_value(issue_data, issue_array_data[field_index + 1], field_setting)
         end
       end
 
@@ -198,9 +202,11 @@ class RedmineExcelConnectorController < ApplicationController
         issue_data[:project_id] = @project.id
       end
 
-      unless projects[issue_data[:project_id]]
-        project = Project.find(issue_data[:project_id])
-        projects[issue_data[:project_id]] = [project, User.current.allowed_to?(:add_issues, project)]
+      unless issue_data[:project_id] && issue_data[:project_id].to_i > 0 && projects[issue_data[:project_id]]
+        project = Project.where(:id => issue_data[:project_id].to_i).first
+        if project
+          projects[issue_data[:project_id]] = [project, User.current.allowed_to?(:add_issues, project)]
+        end
       end
 
       if issue_data[:row_id] and issue_data[:id]
@@ -273,13 +279,14 @@ class RedmineExcelConnectorController < ApplicationController
           end
         else
           project_info = projects[issue_data.delete(:project_id)]
-          unless project_info[1]
+
+          if project_info && (not project_info[1])
             add_to_errors(errors, line_no, [l(:issue_not_addable)])
           else
             issue_data = convert_issue_data(issue_data)
             issue_obj = Issue.new
             issue_obj.author = User.current
-            issue_obj.project_id =project_info[0].id
+            issue_obj.project_id = project_info[0].id if project_info
             issue_obj.safe_attributes = issue_data
             if issue_obj.save
               issue_obj[:id] = issue_obj.id
@@ -350,10 +357,10 @@ class RedmineExcelConnectorController < ApplicationController
       end
     end
 
-    render :json => {
+    render :json => json_ok({
       :updated_issues => updated_issues,
       :errors => errors
-    }
+    })
   end
 
   def find_optional_project
