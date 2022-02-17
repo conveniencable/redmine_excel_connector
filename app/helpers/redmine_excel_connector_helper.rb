@@ -124,7 +124,7 @@ module RedmineExcelConnectorHelper
   def field_settings()
     common_fields = []
     common_fields << { :label => '#', :name => 'id', :type => 'integer' }
-    common_fields << { :label => '$', :name => 'row_id', :type => 'string', :readonly => true }
+    common_fields << { :label => '$', :name => 'row_id', :type => 'string' }
     common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :config_objects => Project }
     common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer' }
     common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
@@ -181,7 +181,7 @@ module RedmineExcelConnectorHelper
       if field_setting[:name] == 'relations'
         relation_values = []
         field_value.split(/\r?\n/).each do |relation_value|
-          match_data = /(\S+)\s+([#\$]\d+)/.match(relation_value)
+          match_data = /^(\S+)\s+([#\$]\d+)$/.match(relation_value)
           if match_data
             relation_type_name = match_data[1]
             to_id = match_data[2]
@@ -191,7 +191,7 @@ module RedmineExcelConnectorHelper
             if relation_type
               relation_value << { :relation_type => relation_type[:id] }
               if to_id.start_with?('#')
-                relation_value[:to_id] = to_id.to_i
+                relation_value[:to_id] = to_id[1..-1].to_i
               elsif to_id.start_with?('$')
                 relation_value[:to_row_id] = to_id[1..-1]
               end
@@ -199,7 +199,7 @@ module RedmineExcelConnectorHelper
               relation_values << relation_value
             end
           else
-            match_data = /(\S+)\s+\((\d+)\)\s+([#\$]\d+)/.match(relation_value)
+            match_data = /^(\S+)\s+\((\d+)\)\s+([#\$]\d+)$/.match(relation_value)
             if match_data
               relation_type_name = match_data[1]
               delay_day = match_data[2]
@@ -209,7 +209,7 @@ module RedmineExcelConnectorHelper
               if relation_type
                 relation_value = { :relation_type => relation_type[:id], :delay => delay_day.to_i }
                 if to_id.start_with?('#')
-                  relation_value[:to_id] = to_id.to_i
+                  relation_value[:to_id] = to_id[1..-1].to_i
                 elsif to_id.start_with?('$')
                   relation_value[:to_row_id] = to_id[1..-1]
                 end

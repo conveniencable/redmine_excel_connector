@@ -145,7 +145,8 @@ class RedmineExcelConnectorController < ApplicationController
         :limit => @limit,
         :total_count => @issue_count,
         :issues => issues_data,
-        :columnSettings => columnSettings
+        :columnSettings => columnSettings,
+        :project_id => @project.present? ? @project.id : nil
       })
     else
       render :json => json_error('invalid query params')
@@ -154,7 +155,6 @@ class RedmineExcelConnectorController < ApplicationController
 
   def save_issues
     fields = field_settings
-    unknown_parent_row_id_to_id = params[:unknown_parent_row_id_to_id]
 
     header_settings = []
     params[:headers].each do |field_name|
@@ -174,7 +174,8 @@ class RedmineExcelConnectorController < ApplicationController
     load_field_setting_getter(header_settings)
 
     issue_datas = []
-    row_id_to_id = {}
+    partial_save_issue_line_nos = []
+    row_id_to_id = params[:row_ids_to_ids].clone()
     id_to_line_no = {}
     projects = {}
 
@@ -209,10 +210,12 @@ class RedmineExcelConnectorController < ApplicationController
         end
       end
 
-      if issue_data[:row_id] and issue_data[:id]
-        row_id_to_id[issue_data[:row_id]] = issue_data[:id].to_i
-      else
-        row_id_to_id[issue_data[:row_id]] = 'new'
+      if issue_data[:row_id]
+        if issue_data[:id]
+          row_id_to_id[issue_data[:row_id]] = issue_data[:id].to_i
+        else
+          row_id_to_id[issue_data[:row_id]] = 'new'
+        end
       end
 
       if issue_data[:relations]
@@ -220,9 +223,9 @@ class RedmineExcelConnectorController < ApplicationController
         relations.each do |r|
           r[:line_no] = line_no
           if issue_data[:id]
-            r[:form_id] = issue_data[:id].to_i
+            r[:from_id] = issue_data[:id].to_i
           else
-            r[:form_row_id] = issue_data[:row_id]
+            r[:from_row_id] = issue_data[:row_id]
           end
 
           all_relations << r
@@ -239,21 +242,22 @@ class RedmineExcelConnectorController < ApplicationController
           if row_id_fragments.length > 1
             parent_row_id = row_id_fragments[0..-2].join('.')
 
-            parent_id = unknown_parent_row_id_to_id[parent_row_id].to_i if unknown_parent_row_id_to_id[parent_row_id]
-            parent_id = row_id_to_id[parent_row_id] unless parent_id
+            parent_id = row_id_to_id[parent_row_id]
 
             if parent_id
               if parent_id == 'new'
                 issue_data_save_later << issue_data
-                continue
+                next
               else
                 issue_data[:parent_issue_id] = parent_id
               end
+            else
+              partial_save_issue_line_nos << issue_data[:line_no]
             end
           end
         end
 
-        line_no = issue_data.delete(:line_no).to_i
+        line_no = issue_data.delete(:line_no)
         row_id = issue_data.delete(:row_id)
         if issue_data[:id]
           id = issue_data.delete(:id).to_i
@@ -294,6 +298,7 @@ class RedmineExcelConnectorController < ApplicationController
               row_id_to_id[row_id] = issue_obj.id if row_id
               id_to_line_no[issue_obj.id] = line_no
             else
+              delete row_id_to_id[row_id]
               add_to_errors(errors, line_no, issue_obj.errors.full_messages)
             end
           end
@@ -307,26 +312,24 @@ class RedmineExcelConnectorController < ApplicationController
         if r[:to_row_id]
           if row_id_to_id[r[:to_row_id]]
             if row_id_to_id[r[:to_row_id]] == 'new'
-              continue
+              partial_save_issue_line_nos << r[:line_no]
+              next
             end
             r[:to_id] = row_id_to_id[r[:to_row_id]]
           end
 
-          if unknown_parent_row_id_to_id[r[:to_row_id]]
-            r[:to_id] = unknown_parent_row_id_to_id[r[:to_row_id]].to_i
-          end
         end
 
         unless r[:to_id]
-          add_to_errors(errors, line_no, ["relation target '#{r[:to_row_id]}' error"])
-          continue
+          add_to_errors(errors, r[:line_no], ["relation target '$#{r[:to_row_id]}' error"])
+          next
         end
       end
 
       if not r[:from_id]
         if row_id_to_id[r[:from_row_id]]
           if row_id_to_id[r[:from_row_id]] == 'new'
-            continue
+            next
           end
           r[:from_id] = row_id_to_id[r[:from_row_id]]
         end
@@ -359,7 +362,8 @@ class RedmineExcelConnectorController < ApplicationController
 
     render :json => json_ok({
       :updated_issues => updated_issues,
-      :errors => errors
+      :errors => errors,
+      :partial_save_issue_line_nos => partial_save_issue_line_nos
     })
   end
 
