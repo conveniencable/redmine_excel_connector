@@ -134,7 +134,7 @@ class RedmineExcelConnectorController < ApplicationController
 
           col_data
         end
-        
+
         columnSettings << fields.find{|f| f[:name] == 'relations'}
       end
 
@@ -144,7 +144,7 @@ class RedmineExcelConnectorController < ApplicationController
         :total_count => @issue_count,
         :issues => issues_data,
         :columnSettings => columnSettings,
-        :project_id => @project.present? ? @project.id : nil
+        :projectId => @project.present? ? @project.id : nil
       })
     else
       render :json => json_error('invalid query params')
@@ -173,8 +173,14 @@ class RedmineExcelConnectorController < ApplicationController
 
     issue_datas = []
     partial_save_issue_line_nos = []
-    id_to_line_no = params[:id_to_line_no].clone()
-    line_no_to_id = Hash[id_to_line_no.to_a.reverse]
+    id_to_line_no = {}
+    line_no_to_id = {}
+    params[:id_to_line_no].each do |k, v|
+      k = k.to_i
+      v = v.to_i
+      id_to_line_no[k] = v
+      line_no_to_id[v] = k
+    end
 
     projects = {}
 
@@ -192,7 +198,6 @@ class RedmineExcelConnectorController < ApplicationController
 
       line_no = issue_array_data[0].to_i
       issue_data = {:line_no => line_no}
-      issue_datas << issue_data
 
       header_settings.each_with_index do |field_setting, field_index|
         if field_setting
@@ -212,6 +217,9 @@ class RedmineExcelConnectorController < ApplicationController
         project = Project.where(:id => issue_data[:project_id].to_i).first
         if project
           projects[issue_data[:project_id]] = [project, User.current.allowed_to?(:add_issues, project)]
+        else
+          add_to_errors(errors, line_no, [l(:project_not_exist)])
+          next
         end
       end
 
@@ -226,6 +234,8 @@ class RedmineExcelConnectorController < ApplicationController
           all_relations << r
         end
       end
+
+      issue_datas << issue_data
     end
 
     saving_datas = issue_datas
@@ -243,6 +253,9 @@ class RedmineExcelConnectorController < ApplicationController
               if new_data_line_nos.include?(parent_line_no)
                 issue_data_save_later << issue_data
                 next
+              else
+                partial_save_issue_line_nos << issue_data[:line_no]
+                add_to_errors(errors, issue_data[:line_no], [l(:parent_target_not_found, "$#{parent_line_no}")])
               end
             end
           else
@@ -313,7 +326,7 @@ class RedmineExcelConnectorController < ApplicationController
         end
 
         unless r[:to_id]
-          add_to_errors(errors, r[:line_no], ["relation target '$#{r[:to_line_no]}' error"])
+          add_to_errors(errors, r[:line_no], [l(:relation_target_not_found, "$#{r[:to_line_no]}")])
           next
         end
       end

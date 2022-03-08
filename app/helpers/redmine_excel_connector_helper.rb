@@ -192,7 +192,7 @@ module RedmineExcelConnectorHelper
               if to_id.start_with?('#')
                 relation_value[:to_id] = to_id[1..-1].to_i
               elsif to_id.start_with?('$')
-                relation_value[:to_line_no] = to_id[1..-1]
+                relation_value[:to_line_no] = to_id[1..-1].to_i
               end
 
               relation_values << relation_value
@@ -210,7 +210,7 @@ module RedmineExcelConnectorHelper
                 if to_id.start_with?('#')
                   relation_value[:to_id] = to_id[1..-1].to_i
                 elsif to_id.start_with?('$')
-                  relation_value[:to_line_no] = to_id[1..-1]
+                  relation_value[:to_line_no] = to_id[1..-1].to_i
                 end
                 relation_values << relation_value
               end
