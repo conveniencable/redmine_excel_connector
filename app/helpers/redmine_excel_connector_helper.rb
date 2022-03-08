@@ -124,7 +124,6 @@ module RedmineExcelConnectorHelper
   def field_settings()
     common_fields = []
     common_fields << { :label => '#', :name => 'id', :type => 'integer' }
-    common_fields << { :label => '$', :name => 'row_id', :type => 'string' }
     common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :config_objects => Project }
     common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer' }
     common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
@@ -193,7 +192,7 @@ module RedmineExcelConnectorHelper
               if to_id.start_with?('#')
                 relation_value[:to_id] = to_id[1..-1].to_i
               elsif to_id.start_with?('$')
-                relation_value[:to_row_id] = to_id[1..-1]
+                relation_value[:to_line_no] = to_id[1..-1]
               end
 
               relation_values << relation_value
@@ -211,7 +210,7 @@ module RedmineExcelConnectorHelper
                 if to_id.start_with?('#')
                   relation_value[:to_id] = to_id[1..-1].to_i
                 elsif to_id.start_with?('$')
-                  relation_value[:to_row_id] = to_id[1..-1]
+                  relation_value[:to_line_no] = to_id[1..-1]
                 end
                 relation_values << relation_value
               end
@@ -233,7 +232,9 @@ module RedmineExcelConnectorHelper
     end
 
     if value
-      if field_setting[:type] == 'date' or field_setting[:type] == 'datetime'
+      if field_setting[:type] == 'integer'
+        value = value.to_i
+      elsif field_setting[:type] == 'date' or field_setting[:type] == 'datetime'
         value = parse_oa_date(value)
       end
     end

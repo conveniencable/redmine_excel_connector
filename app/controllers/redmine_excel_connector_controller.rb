@@ -134,9 +134,7 @@ class RedmineExcelConnectorController < ApplicationController
 
           col_data
         end
-
-        columnSettings.insert(1, fields.find{|f| f[:name] == 'row_id'})
-
+        
         columnSettings << fields.find{|f| f[:name] == 'relations'}
       end
 
@@ -175,14 +173,17 @@ class RedmineExcelConnectorController < ApplicationController
 
     issue_datas = []
     partial_save_issue_line_nos = []
-    row_id_to_id = params[:row_ids_to_ids].clone()
-    id_to_line_no = {}
+    id_to_line_no = params[:id_to_line_no].clone()
+    line_no_to_id = Hash[id_to_line_no.to_a.reverse]
+
     projects = {}
 
     errors = {}
     updated_issues = {}
 
     all_relations = []
+
+    new_data_line_nos = []
 
     params[:issues].each do |issue_array_data|
       if issue_array_data.length <= 1
@@ -199,22 +200,18 @@ class RedmineExcelConnectorController < ApplicationController
         end
       end
 
+      if !issue_data[:id] || issue_data[:id] <= 0
+        new_data_line_nos << line_no
+      end
+
       if @project.present? and not issue_data[:project_id].present?
         issue_data[:project_id] = @project.id
       end
 
-      unless issue_data[:project_id] && issue_data[:project_id].to_i > 0 && projects[issue_data[:project_id]]
+      if issue_data[:project_id] && issue_data[:project_id].to_i > 0 && !projects[issue_data[:project_id]]
         project = Project.where(:id => issue_data[:project_id].to_i).first
         if project
           projects[issue_data[:project_id]] = [project, User.current.allowed_to?(:add_issues, project)]
-        end
-      end
-
-      if issue_data[:row_id]
-        if issue_data[:id]
-          row_id_to_id[issue_data[:row_id]] = issue_data[:id].to_i
-        else
-          row_id_to_id[issue_data[:row_id]] = 'new'
         end
       end
 
@@ -224,8 +221,6 @@ class RedmineExcelConnectorController < ApplicationController
           r[:line_no] = line_no
           if issue_data[:id]
             r[:from_id] = issue_data[:id].to_i
-          else
-            r[:from_row_id] = issue_data[:row_id]
           end
 
           all_relations << r
@@ -237,31 +232,27 @@ class RedmineExcelConnectorController < ApplicationController
     while saving_datas.length > 0
       issue_data_save_later = []
       saving_datas.each do |issue_data|
-        if !issue_data[:project_id].present? && issue_data[:row_id].present?
-          row_id_fragments = issue_data[:row_id].split('.')
-          if row_id_fragments.length > 1
-            parent_row_id = row_id_fragments[0..-2].join('.')
-
-            parent_id = row_id_to_id[parent_row_id]
-
-            if parent_id
-              if parent_id == 'new'
+        if issue_data[:issue_project_id]
+          if issue_data[:issue_project_id].start_with?('#')
+            issue_data[:issue_project_id] = issue_data[:issue_project_id][1..-1].to_i
+          elsif issue_data[:issue_project_id].start_with?('$')
+            parent_line_no = issue_data[:issue_project_id][1..-1].to_i
+            if line_no_to_id[parent_line_no]
+              issue_data[:issue_project_id] = line_no_to_id[parent_line_no]
+            else
+              if new_data_line_nos.include?(parent_line_no)
                 issue_data_save_later << issue_data
                 next
-              else
-                issue_data[:parent_issue_id] = parent_id
               end
-            else
-              partial_save_issue_line_nos << issue_data[:line_no]
             end
+          else
+            issue_data[:issue_project_id] = issue_data[:issue_project_id].to_i
           end
         end
 
         line_no = issue_data.delete(:line_no)
-        row_id = issue_data.delete(:row_id)
         if issue_data[:id]
-          id = issue_data.delete(:id).to_i
-
+          id = issue_data.delete(:id)
           issue_obj = Issue.where(:id => id).first
 
           unless issue_obj
@@ -274,6 +265,7 @@ class RedmineExcelConnectorController < ApplicationController
               if issue_obj.save
                 updated_issues[issue_obj.id] = {:line_no => line_no, :updated_on => format_time(issue_obj.updated_on), :last_updated_by => issue_obj.last_updated_by && issue_obj.last_updated_by.name}
                 id_to_line_no[issue_obj.id] = line_no
+                line_no_to_id[line_no] = issue_obj.id
               else
                 add_to_errors(errors, line_no, issue_obj.errors.full_messages)
               end
@@ -295,44 +287,39 @@ class RedmineExcelConnectorController < ApplicationController
             if issue_obj.save
               issue_obj[:id] = issue_obj.id
               updated_issues[issue_obj.id] = {:line_no => line_no, :id => issue_obj.id, :created_on => format_time(issue_obj.created_on), :updated_on => format_time(issue_obj.updated_on), :author => issue_obj.author.name, :last_updated_by => issue_obj.author.name}
-              row_id_to_id[row_id] = issue_obj.id if row_id
               id_to_line_no[issue_obj.id] = line_no
+              line_no_to_id[line_no] = issue_obj.id
             else
-              delete row_id_to_id[row_id]
               add_to_errors(errors, line_no, issue_obj.errors.full_messages)
             end
           end
+
+          new_data_line_nos.delete(line_no)
         end
       end
       saving_datas = issue_data_save_later
     end
 
     all_relations.each do |r|
-      if not r[:to_id]
-        if r[:to_row_id]
-          if row_id_to_id[r[:to_row_id]]
-            if row_id_to_id[r[:to_row_id]] == 'new'
-              partial_save_issue_line_nos << r[:line_no]
-              next
-            end
-            r[:to_id] = row_id_to_id[r[:to_row_id]]
-          end
+      unless line_no_to_id[r[:line_no]]
+        next
+      end
 
+      if not r[:to_id]
+        if r[:to_line_no]
+          if line_no_to_id[r[:to_line_no]]
+            r[:to_id] = line_no_to_id[r[:to_line_no]]
+          end
         end
 
         unless r[:to_id]
-          add_to_errors(errors, r[:line_no], ["relation target '$#{r[:to_row_id]}' error"])
+          add_to_errors(errors, r[:line_no], ["relation target '$#{r[:to_line_no]}' error"])
           next
         end
       end
 
       if not r[:from_id]
-        if row_id_to_id[r[:from_row_id]]
-          if row_id_to_id[r[:from_row_id]] == 'new'
-            next
-          end
-          r[:from_id] = row_id_to_id[r[:from_row_id]]
-        end
+          r[:from_id] = line_no_to_id[r[:line_no]]
       end
 
       result = save_relation(r)
@@ -354,6 +341,7 @@ class RedmineExcelConnectorController < ApplicationController
       end
 
       if update_data
+        update_data[:parent_id] = issue.parent_id
         update_data[:start_date] = format_date(issue.start_date)
         update_data[:due_date] = format_date(issue.due_date)
         update_data[:status] = issue.status.name
