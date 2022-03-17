@@ -151,6 +151,21 @@ class RedmineExcelConnectorController < ApplicationController
     end
   end
 
+  def after_load_issue
+    issue_ids = params[:issue_ids] || []
+    issue_ids = issue_ids.map{|v| v.to_i}
+
+    deleted_ids = []
+    if issue_ids && issue_ids.length > 0
+      exist_ids = Issue.select(:id).find(issue_ids)
+      deleted_ids = issue_ids.select { |v| exist_ids.include? v }
+    end
+
+    render :json => json_ok({
+                              :deleted_ids => deleted_ids
+                            })
+  end
+
   def save_issues
     fields = field_settings
 
