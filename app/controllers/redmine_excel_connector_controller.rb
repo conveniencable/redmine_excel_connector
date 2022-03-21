@@ -91,10 +91,23 @@ class RedmineExcelConnectorController < ApplicationController
   def issues
     retrieve_query
 
+    if Redmine::VERSION::MAJOR < 4
+      params[:sort] = @query.sort_criteria if @query.sort_criteria.present?
+      sort_init(@query.sort_criteria.empty? ? [['id', 'desc']] : @query.sort_criteria)
+      sort_update(@query.sortable_columns)
+      @query.sort_criteria = sort_criteria.to_a
+    end
+
     if @query.valid?
       @offset, @limit = api_offset_and_limit
       @issue_count = @query.issue_count
-      @issues = @query.issues(:offset => @offset, :limit => @limit)
+
+      query_params = {:offset => @offset, :limit => @limit}
+      if Redmine::VERSION::MAJOR < 4
+        query_params[:order] = sort_clause
+      end
+
+      @issues = @query.issues(query_params)
 
       @relation_types_list = relation_types_list
       all_ids = @issues.map(&:id)
