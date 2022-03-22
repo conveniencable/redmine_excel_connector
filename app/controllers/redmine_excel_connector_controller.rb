@@ -357,6 +357,12 @@ class RedmineExcelConnectorController < ApplicationController
           add_to_errors(errors, r[:line_no], [l(:relation_target_not_found, "$#{r[:to_line_no]}")])
           next
         end
+      else
+
+        if Issue.where(:id => r[:to_id]).count == 0
+          add_to_errors(errors, r[:line_no], [l(:relation_target_issue_not_exist, :id => "#{r[:to_id]}")])
+          next
+        end
       end
 
       if not r[:from_id]
@@ -366,7 +372,7 @@ class RedmineExcelConnectorController < ApplicationController
       result = save_relation(r)
 
       if result && result.errors && !result.errors.full_messages.empty?
-        add_to_errors(errors, line_no, result.errors.full_messages)
+        add_to_errors(errors, r[:line_no], result.errors.full_messages)
       end
     end
 
@@ -394,6 +400,25 @@ class RedmineExcelConnectorController < ApplicationController
       :errors => errors,
       :partial_save_issue_line_nos => partial_save_issue_line_nos
     })
+  end
+
+  def delete_issue
+    id = params[:id]
+    issue = Issue.find id
+
+    error = ''
+    if issue
+      if (issue.respond_to?('deletable?') && !issue.deletable?)
+        error = l(:not_authorized_to_delete)
+      else
+        issue.destroy
+      end
+    end
+
+    render :json => json_ok(error)
+
+  rescue ActiveRecord::RecordNotFound
+    render :json => json_ok(nil)
   end
 
   def find_optional_project

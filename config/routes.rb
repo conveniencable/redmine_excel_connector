@@ -8,5 +8,6 @@ get '/redmine_excel_connector/api/filter_values' => 'redmine_excel_connector#fil
 get '/redmine_excel_connector/api/issues' => 'redmine_excel_connector#issues'
 post '/redmine_excel_connector/api/issues' => 'redmine_excel_connector#save_issues'
 post '/redmine_excel_connector/api/after_load_issue' => 'redmine_excel_connector#after_load_issue'
+delete '/redmine_excel_connector/api/issues' => 'redmine_excel_connector#delete_issue'
 
 get '/redmine_excel_connector/*react_path' => 'redmine_excel_connector#index'

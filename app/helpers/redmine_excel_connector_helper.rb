@@ -180,7 +180,7 @@ module RedmineExcelConnectorHelper
       if field_setting[:name] == 'relations'
         relation_values = []
         field_value.split(/\r?\n/).each do |relation_value|
-          match_data = /^(\S+)\s+([#\$]\d+)$/.match(relation_value)
+          match_data = /^(.+)?\s+([#\$]\d+)$/.match(relation_value)
           if match_data
             relation_type_name = match_data[1]
             to_id = match_data[2]
@@ -188,7 +188,7 @@ module RedmineExcelConnectorHelper
             relation_type = field_setting[:relation_types].find { |rt| rt[:name] == relation_type_name }
 
             if relation_type
-              relation_value << { :relation_type => relation_type[:id] }
+              relation_value = { :relation_type => relation_type[:id] }
               if to_id.start_with?('#')
                 relation_value[:to_id] = to_id[1..-1].to_i
               elsif to_id.start_with?('$')
@@ -198,11 +198,11 @@ module RedmineExcelConnectorHelper
               relation_values << relation_value
             end
           else
-            match_data = /^(\S+)\s+\((\d+)\)\s+([#\$]\d+)$/.match(relation_value)
+            match_data = /^(.+)?\s+([#\$]\d+)\s*,\s*delay (\d+)$/.match(relation_value)
             if match_data
               relation_type_name = match_data[1]
-              delay_day = match_data[2]
-              to_id = match_data[3]
+              to_id = match_data[2]
+              delay_day = match_data[3]
 
               relation_type = field_setting[:relation_types].find { |rt| rt[:name] == relation_type_name }
               if relation_type
