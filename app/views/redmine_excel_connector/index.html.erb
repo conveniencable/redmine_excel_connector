@@ -1,27 +1,7 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr">
-    <head>
-        <meta charset="UTF-8"/>
-        <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-        <title>Redmien Excel Connector</title>
-    </head>
-    <body>
-        <div id="root"></div>
-        
-
-        
-
-        <% if User.current.logged?
-        %>
-            <script>
-            var RX__CurrentUser = <%=current_user.to_json.html_safe%>;
-            </script>
-        <%
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="UTF-8"/><meta http-equiv="X-UA-Compatible" content="IE=Edge"/><title>Redmien Excel Connector</title></head><body><div id="root"></div> <% if User.current.logged?
+        %> <script>var RX__CurrentUser = <%=current_user.to_json.html_safe%>;</script> <%
         end
-        %>
-
-    <script>
-        var RX__LANG = <%={
+        %> <script>var RX__LANG = <%={
             :login => l(:label_login), 
             :logout => l(:label_logout),
             :project => l(:label_project),
@@ -37,9 +17,6 @@
             :confirm_overload => l(:confirm_overload),
             :label_sort => l(:label_sort),
             :label_ascending => l(:label_ascending),
-            :label_descending => l(:label_descending)
-        }.to_json.html_safe%>;
-    </script>
-
-    <script src="/js/bundle.min.js"></script></body>
-</html>
+            :label_descending => l(:label_descending),
+            :error_complete_value => l(:error_complete_value)
+        }.to_json.html_safe%>;</script><script src="/plugin_assets/redmine_excel_connector/react-dist/js/bundle.app.min.js"></script><script src="/plugin_assets/redmine_excel_connector/react-dist/js/bundle.vendor.min.js"></script></body></html>

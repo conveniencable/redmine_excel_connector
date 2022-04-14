@@ -283,6 +283,7 @@ module RedmineExcelConnectorHelper
 
       relation.delay = relation_data[:delay]
       relation.relation_type = relation_data[:relation_type]
+      relation.control_by_id = relation_data[:control_by_id]
 
       relation.save
     else
@@ -291,6 +292,7 @@ module RedmineExcelConnectorHelper
       relation.issue_to_id = relation_data[:to_id]
       relation.relation_type = relation_data[:relation_type]
       relation.delay = relation_data[:delay]
+      relation.control_by_id = relation_data[:control_by_id]
 
       relation.save
     end

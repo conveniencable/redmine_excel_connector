@@ -119,13 +119,12 @@ class RedmineExcelConnectorController < ApplicationController
           issue_data[column.name] = csv_content(column, issue)
         end
 
-        issue_relations = relations.select{|relation| relation.issue_from_id == issue.id}
+        issue_relations = relations.select{|relation| relation.control_by_id == issue.id or ((not relation.control_by_id) and relation.issue_from_id == issue.id)}
 
         unless issue_relations.blank?
-          issue_data['relations'] = issue_relations
+          issue_data['relations'] = issue_relations.map{|r| {:to_id => r.issue_to_id, :relation_type => r.relation_type, :delay => r.delay}}.to_json unless issue_relations.blank?
         end
 
-        issue_data['relations'] = issue_relations.map{|r| {:to_id => r.issue_to_id, :relation_type => r.relation_type, :delay => r.delay}}.to_json unless issue_relations.blank?
 
         issue_data
       end
@@ -256,7 +255,9 @@ class RedmineExcelConnectorController < ApplicationController
         relations.each do |r|
           r[:line_no] = line_no
           if issue_data[:id]
-            r[:from_id] = issue_data[:id].to_i
+            issue_data[:id].to_i
+            r[:from_id] = issue_id
+            r[:control_by_id] = issue_id
           end
 
           all_relations << r
@@ -270,13 +271,13 @@ class RedmineExcelConnectorController < ApplicationController
     while saving_datas.length > 0
       issue_data_save_later = []
       saving_datas.each do |issue_data|
-        if issue_data[:issue_project_id]
-          if issue_data[:issue_project_id].start_with?('#')
-            issue_data[:issue_project_id] = issue_data[:issue_project_id][1..-1].to_i
-          elsif issue_data[:issue_project_id].start_with?('$')
-            parent_line_no = issue_data[:issue_project_id][1..-1].to_i
+        if issue_data[:parent_issue_id]
+          if issue_data[:parent_issue_id].start_with?('#')
+            issue_data[:parent_issue_id] = issue_data[:parent_issue_id][1..-1].to_i
+          elsif issue_data[:parent_issue_id].start_with?('$')
+            parent_line_no = issue_data[:parent_issue_id][1..-1].to_i
             if line_no_to_id[parent_line_no]
-              issue_data[:issue_project_id] = line_no_to_id[parent_line_no]
+              issue_data[:parent_issue_id] = line_no_to_id[parent_line_no]
             else
               if new_data_line_nos.include?(parent_line_no)
                 issue_data_save_later << issue_data
@@ -287,7 +288,7 @@ class RedmineExcelConnectorController < ApplicationController
               end
             end
           else
-            issue_data[:issue_project_id] = issue_data[:issue_project_id].to_i
+            issue_data[:parent_issue_id] = issue_data[:parent_issue_id].to_i
           end
         end
 
@@ -378,6 +379,8 @@ class RedmineExcelConnectorController < ApplicationController
 
     all_issue_ids = id_to_line_no.keys()
 
+    relations = IssueRelation.where('issue_from_id in (?) or issue_to_id in (?)', all_issue_ids, all_issue_ids)
+
     Issue.where(:id => all_issue_ids).each do |issue|
       update_data = nil
       if updated_issues[issue.id]
@@ -388,6 +391,11 @@ class RedmineExcelConnectorController < ApplicationController
       end
 
       if update_data
+        issue_relations = relations.select{|relation| relation.control_by_id == issue.id or ((not relation.control_by_id) and relation.issue_from_id == issue.id)}
+        unless issue_relations.blank?
+          update_data['relations'] = issue_relations.map{|r| {:to_id => r.issue_to_id, :relation_type => r.relation_type, :delay => r.delay}}.to_json unless issue_relations.blank?
+        end
+
         update_data[:parent_id] = issue.parent_id
         update_data[:start_date] = format_date(issue.start_date)
         update_data[:due_date] = format_date(issue.due_date)
