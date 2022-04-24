@@ -315,6 +315,29 @@ module RedmineExcelConnectorHelper
     end
   end
 
+  def format_excel_relation(relations, issue_id)
+    issue_relations = relations.select{|relation| relation.control_by_id == issue_id or ((not relation.control_by_id) and relation.issue_from_id == issue_id)}
+    result = []
+    issue_relations.each do |r|
+      issue_to_id = r.issue_to_id
+      relation_type = r.relation_type
+      if r.issue_from_id != issue_id
+        issue_to_id = r.issue_from_id
+        IssueRelation::TYPES.each_key do |type|
+          if IssueRelation::TYPES[type][:reverse] == relation_type
+            relation_type = type
+            break
+          end
+        end
+
+      end
+
+      result << {:to_id => issue_to_id, :relation_type => relation_type, :delay => r.delay}
+    end
+
+    result.to_json
+  end
+
   def add_to_errors(errors, line_no, data)
     errors[line_no] = [] unless errors[line_no]
 

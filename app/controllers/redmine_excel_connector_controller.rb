@@ -119,12 +119,7 @@ class RedmineExcelConnectorController < ApplicationController
           issue_data[column.name] = csv_content(column, issue)
         end
 
-        issue_relations = relations.select{|relation| relation.control_by_id == issue.id or ((not relation.control_by_id) and relation.issue_from_id == issue.id)}
-
-        unless issue_relations.blank?
-          issue_data['relations'] = issue_relations.map{|r| {:to_id => r.issue_to_id, :relation_type => r.relation_type, :delay => r.delay}}.to_json unless issue_relations.blank?
-        end
-
+        issue_data['relations'] = format_excel_relation(relations, issue.id)
 
         issue_data
       end
@@ -255,7 +250,7 @@ class RedmineExcelConnectorController < ApplicationController
         relations.each do |r|
           r[:line_no] = line_no
           if issue_data[:id]
-            issue_data[:id].to_i
+            issue_id = issue_data[:id].to_i
             r[:from_id] = issue_id
             r[:control_by_id] = issue_id
           end
@@ -367,39 +362,15 @@ class RedmineExcelConnectorController < ApplicationController
       end
 
       if not r[:from_id]
-          r[:from_id] = line_no_to_id[r[:line_no]]
+        issue_id = line_no_to_id[r[:line_no]]
+        r[:from_id] = issue_id
+        r[:control_by_id] = issue_id
       end
 
       result = save_relation(r)
 
       if result && result.errors && !result.errors.full_messages.empty?
         add_to_errors(errors, r[:line_no], result.errors.full_messages)
-      end
-    end
-
-    all_issue_ids = id_to_line_no.keys()
-
-    relations = IssueRelation.where('issue_from_id in (?) or issue_to_id in (?)', all_issue_ids, all_issue_ids)
-
-    Issue.where(:id => all_issue_ids).each do |issue|
-      update_data = nil
-      if updated_issues[issue.id]
-        update_data = updated_issues[issue.id]
-      elsif id_to_line_no[issue.id]
-        update_data = {:line_no => id_to_line_no[issue.id]}
-        updated_issues[issue.id] = update_data
-      end
-
-      if update_data
-        issue_relations = relations.select{|relation| relation.control_by_id == issue.id or ((not relation.control_by_id) and relation.issue_from_id == issue.id)}
-        unless issue_relations.blank?
-          update_data['relations'] = issue_relations.map{|r| {:to_id => r.issue_to_id, :relation_type => r.relation_type, :delay => r.delay}}.to_json unless issue_relations.blank?
-        end
-
-        update_data[:parent_id] = issue.parent_id
-        update_data[:start_date] = format_date(issue.start_date)
-        update_data[:due_date] = format_date(issue.due_date)
-        update_data[:status] = issue.status.name
       end
     end
 
