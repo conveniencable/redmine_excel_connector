@@ -111,15 +111,19 @@ class RedmineExcelConnectorController < ApplicationController
 
       @relation_types_list = relation_types_list
       all_ids = @issues.map(&:id)
-      relations = IssueRelation.where('issue_from_id in (?) or issue_to_id in (?)', all_ids, all_ids)
+      need_relations = @query.columns.find{|column| column.name == :relations}
+
+      relations = IssueRelation.where('issue_from_id in (?) or issue_to_id in (?)', all_ids, all_ids) if need_relations
 
       issues_data = @issues.map do |issue|
         issue_data = {:parent_id => issue.parent_id.to_s, :updated_on => issue.updated_on}
         @query.columns.each do |column|
-          issue_data[column.name] = csv_content(column, issue)
+          if column.name != :relations
+            issue_data[column.name] = csv_content(column, issue)
+          end
         end
 
-        issue_data['relations'] = format_excel_relation(relations, issue.id)
+        issue_data['relations'] = format_excel_relation(relations, issue.id) if need_relations
 
         issue_data
       end
@@ -136,13 +140,12 @@ class RedmineExcelConnectorController < ApplicationController
             :possible_values => field ? field[:possible_values] : nil,
             :possible_objects => field ? field[:possible_objects] : nil,
             :type => field ? field[:type] : 'string',
-            :read_only => field ? field[:readonly] : false
+            :read_only => field ? field[:readonly] : false,
+            :relation_types => field ? field[:relation_types] : nil
           }
 
           col_data
         end
-
-        columnSettings << fields.find{|f| f[:name] == 'relations'}
       end
 
       render :json => json_ok({
