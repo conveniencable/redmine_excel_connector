@@ -223,11 +223,20 @@ class RedmineExcelConnectorController < ApplicationController
 
       line_no = issue_array_data[0].to_i
       issue_data = {:line_no => line_no}
+      issue_errors = []
 
       header_settings.each_with_index do |field_setting, field_index|
         if field_setting
-          parse_field_value(issue_data, issue_array_data[field_index + 1], field_setting)
+          error = parse_field_value(issue_data, issue_array_data[field_index + 1], field_setting)
+          if error
+            issue_errors.append(error)
+          end
         end
+      end
+
+      unless issue_errors.empty?
+        add_to_errors(errors, line_no, issue_errors)
+        next
       end
 
       if !issue_data[:id] || issue_data[:id] <= 0
@@ -340,6 +349,8 @@ class RedmineExcelConnectorController < ApplicationController
       saving_datas = issue_data_save_later
     end
 
+    need_to_update_relations = {}
+
     all_relations.each do |r|
       unless line_no_to_id[r[:line_no]]
         next
@@ -370,11 +381,30 @@ class RedmineExcelConnectorController < ApplicationController
         r[:control_by_id] = issue_id
       end
 
+      to_line_no = r[:to_line_no]
+      from_id = r[:from_id]
       result = save_relation(r)
 
-      if result && result.errors && !result.errors.full_messages.empty?
-        add_to_errors(errors, r[:line_no], result.errors.full_messages)
+      if result
+        if result.errors && !result.errors.full_messages.empty?
+          add_to_errors(errors, r[:line_no], result.errors.full_messages)
+        else
+          if to_line_no
+            need_to_update_relations[from_id] = r[:line_no] unless need_to_update_relations.include? from_id
+          end
+        end
       end
+    end
+
+    need_to_update_relations.keys.each do |issue_id|
+      updated_issue = nil
+      if updated_issues.include? issue_id
+        updated_issue = updated_issues[issue_id]
+      else
+        updated_issue = {:line_no => need_to_update_relations[issue_id]}
+        updated_issues[issue_id] = updated_issue
+      end
+      updated_issue[:relations] = format_excel_relation(Issue.find(issue_id).relations, issue_id)
     end
 
     render :json => json_ok({

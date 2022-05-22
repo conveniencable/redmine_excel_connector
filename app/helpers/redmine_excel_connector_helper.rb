@@ -225,6 +225,8 @@ module RedmineExcelConnectorHelper
         value = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
         if value
           value = value[:id]
+        else
+          return l(:error_value_not_available, field_value)
         end
       else
         value = field_value
@@ -254,6 +256,8 @@ module RedmineExcelConnectorHelper
         issue_data[field_setting[:name].to_sym] = value
       end
     end
+
+    return nil
   end
 
   def convert_issue_data(issue_data)
