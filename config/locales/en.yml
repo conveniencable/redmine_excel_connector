@@ -1,17 +1,17 @@
 # English strings go here for Rails i18n
 en:
-  redmine_excel_connector: Redmine Excel Connector
+  redmine_excel_connector: 'Redmine Excel Connector'
 
   button_load: Load
-  button_load_and_merge: Load and Merge
+  button_load_and_merge: 'Load and Merge'
 
-  issue_not_exists: Issue "#%{id}" doesn't exists or is deleted
-  project_not_exist: Project doesn't exists or is deleted
-  parent_target_not_found: Parent issue "%{value}" is not found
-  relation_target_not_found: Related issue "%{value}" is not found
-  relation_target_issue_not_exist: Related issue "#%{id}" doesn't exists or is deleted
-  issue_not_editable: Not Allow to Edit
-  issue_not_addable: Not Allow to Add
-  confirm_overload: Some Issues have been changed and not saved, are you sure discard your changes?
-  error_complete_value: Please complete the input
-  error_value_not_available: "%{value}" is not an available value
+  issue_not_exists: 'Issue "#%{id}" does NOT exists or is deleted'
+  project_not_exist: 'Project does NOT exists or is deleted'
+  parent_target_not_found: 'Parent issue "%{value}" is not found'
+  relation_target_not_found: 'Related issue "%{value}" is not found'
+  relation_target_issue_not_exist: 'Related issue "#%{id}" does NOT exists or is deleted'
+  issue_not_editable: 'Not Allow to Edit'
+  issue_not_addable: 'Not Allow to Add'
+  confirm_overload: 'Some Issues have been changed and not saved, are you sure discard your changes?'
+  error_complete_value: 'Please complete the input'
+  error_value_not_available: '"%{value}" is not an available value'

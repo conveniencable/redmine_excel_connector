@@ -1,6 +1,6 @@
 # English strings go here for Rails i18n
 en:
-  redmine_excel_connector: Redmine Excel连接器
+  redmine_excel_connector: 'Redmine Excel连接器'
 
   button_load: 加载
   button_load_and_merge: 加载后合并
