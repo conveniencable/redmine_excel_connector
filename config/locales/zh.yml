@@ -1,5 +1,5 @@
 # English strings go here for Rails i18n
-en:
+zh:
   redmine_excel_connector: 'Redmine Excel连接器'
 
   button_load: 加载
