@@ -122,10 +122,11 @@ module RedmineExcelConnectorHelper
   end
 
   def field_settings()
+    bool_possible_values = [l(:general_text_Yes), l(:general_text_No)]
     common_fields = []
     common_fields << { :label => '#', :name => 'id', :type => 'integer' }
     common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :config_objects => Project }
-    common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'integer' }
+    common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'string' }
     common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
     common_fields << { :label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :config_objects => Tracker }
     common_fields << { :label => l(:field_status), :name => 'status', :key => 'status_id', :type => 'string', :possible_objects => IssueStatus.all.map { |i| { :id => i.id, :name => i.name } } }
@@ -142,7 +143,7 @@ module RedmineExcelConnectorHelper
     common_fields << { :label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer', :possible_values => (0..10).to_a.collect { |r| { :name => "#{r * 10}%", :id => r * 10 } } }
     common_fields << { :label => l(:label_description), :name => 'description', :type => 'string' }
 
-    common_fields << { :label => l(:field_is_private), :name => 'is_private', :type => 'bool' }
+    common_fields << { :label => l(:field_is_private), :name => 'is_private', :type => 'bool', :possible_values => bool_possible_values }
     common_fields << { :label => l(:field_created_on), :name => 'created_on', :type => 'datetime', :readonly => true }
     common_fields << { :label => l(:field_updated_on), :name => 'updated_on', :type => 'datetime', :readonly => true }
     common_fields << { :label => l(:field_closed_on), :name => 'closed_on', :type => 'datetime', :readonly => true }
@@ -153,7 +154,7 @@ module RedmineExcelConnectorHelper
     #common_fields << {:name => l(:label_attachment), :name => 'attachment', :type => 'string'}
 
     custom_fields = CustomField.all().map do |cf|
-      { :label => cf.name, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.possible_values }
+      { :label => cf.name, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.field_format == 'bool' ? bool_possible_values : cf.possible_values }
     end
 
     [common_fields, custom_fields].reduce([], :concat)
@@ -180,7 +181,7 @@ module RedmineExcelConnectorHelper
       if field_setting[:name] == 'relations'
         relation_values = []
         field_value.split(/\r?\n/).each do |relation_value|
-          match_data = /^(.+)?\s+([#\$]\d+)$/.match(relation_value)
+          match_data = /^(.+)?\s+([#r]\d+)$/.match(relation_value)
           if match_data
             relation_type_name = match_data[1]
             to_id = match_data[2]
@@ -191,14 +192,14 @@ module RedmineExcelConnectorHelper
               relation_value = { :relation_type => relation_type[:id] }
               if to_id.start_with?('#')
                 relation_value[:to_id] = to_id[1..-1].to_i
-              elsif to_id.start_with?('$')
+              elsif to_id.start_with?('r')
                 relation_value[:to_line_no] = to_id[1..-1].to_i
               end
 
               relation_values << relation_value
             end
           else
-            match_data = /^(.+)?\s+([#\$]\d+)\s*,\s*delay (\d+)$/.match(relation_value)
+            match_data = /^(.+)?\s+([#r]\d+)\s*,\s*delay (\d+)$/.match(relation_value)
             if match_data
               relation_type_name = match_data[1]
               to_id = match_data[2]
@@ -209,7 +210,7 @@ module RedmineExcelConnectorHelper
                 relation_value = { :relation_type => relation_type[:id], :delay => delay_day.to_i }
                 if to_id.start_with?('#')
                   relation_value[:to_id] = to_id[1..-1].to_i
-                elsif to_id.start_with?('$')
+                elsif to_id.start_with?('r')
                   relation_value[:to_line_no] = to_id[1..-1].to_i
                 end
                 relation_values << relation_value
@@ -217,7 +218,6 @@ module RedmineExcelConnectorHelper
             end
           end
         end
-
         unless relation_values.empty?
           value = relation_values
         end
@@ -228,6 +228,8 @@ module RedmineExcelConnectorHelper
         else
           return l(:error_value_not_available, field_value)
         end
+      elsif field_setting[:type] == 'bool'
+        value = field_value && field_value.strip.downcase == l(:general_text_Yes) ? true : false
       else
         value = field_value
       end

@@ -274,6 +274,7 @@ class RedmineExcelConnectorController < ApplicationController
       issue_datas << issue_data
     end
 
+    need_to_update_parents = {}
     saving_datas = issue_datas
     while saving_datas.length > 0
       issue_data_save_later = []
@@ -281,17 +282,18 @@ class RedmineExcelConnectorController < ApplicationController
         if issue_data[:parent_issue_id]
           if issue_data[:parent_issue_id].start_with?('#')
             issue_data[:parent_issue_id] = issue_data[:parent_issue_id][1..-1].to_i
-          elsif issue_data[:parent_issue_id].start_with?('$')
+          elsif issue_data[:parent_issue_id].downcase.start_with?('r')
             parent_line_no = issue_data[:parent_issue_id][1..-1].to_i
             if line_no_to_id[parent_line_no]
               issue_data[:parent_issue_id] = line_no_to_id[parent_line_no]
+              need_to_update_parents[issue_data[:line_no]] = true
             else
               if new_data_line_nos.include?(parent_line_no)
                 issue_data_save_later << issue_data
                 next
               else
                 partial_save_issue_line_nos << issue_data[:line_no]
-                add_to_errors(errors, issue_data[:line_no], [l(:parent_target_not_found, "$#{parent_line_no}")])
+                add_to_errors(errors, issue_data[:line_no], [l(:parent_target_not_found, "r#{parent_line_no}")])
               end
             end
           else
@@ -315,6 +317,10 @@ class RedmineExcelConnectorController < ApplicationController
                 updated_issues[issue_obj.id] = {:line_no => line_no, :updated_on => format_time(issue_obj.updated_on), :last_updated_by => issue_obj.last_updated_by && issue_obj.last_updated_by.name}
                 id_to_line_no[issue_obj.id] = line_no
                 line_no_to_id[line_no] = issue_obj.id
+
+                if need_to_update_parents[line_no]
+                  updated_issues[issue_obj.id][:parent_id] = issue_obj.parent_issue_id
+                end
               else
                 add_to_errors(errors, line_no, issue_obj.errors.full_messages)
               end
@@ -338,6 +344,10 @@ class RedmineExcelConnectorController < ApplicationController
               updated_issues[issue_obj.id] = {:line_no => line_no, :id => issue_obj.id, :created_on => format_time(issue_obj.created_on), :updated_on => format_time(issue_obj.updated_on), :author => issue_obj.author.name, :last_updated_by => issue_obj.author.name}
               id_to_line_no[issue_obj.id] = line_no
               line_no_to_id[line_no] = issue_obj.id
+
+              if need_to_update_parents[line_no]
+                updated_issues[issue_obj.id][:parent_id] = issue_obj.parent_issue_id
+              end
             else
               add_to_errors(errors, line_no, issue_obj.errors.full_messages)
             end
@@ -364,7 +374,7 @@ class RedmineExcelConnectorController < ApplicationController
         end
 
         unless r[:to_id]
-          add_to_errors(errors, r[:line_no], [l(:relation_target_not_found, "$#{r[:to_line_no]}")])
+          add_to_errors(errors, r[:line_no], [l(:relation_target_not_found, "r#{r[:to_line_no]}")])
           next
         end
       else
