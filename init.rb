@@ -2,7 +2,7 @@ Redmine::Plugin.register :redmine_excel_connector do
   name 'Redmine Excel Connector plugin'
   author 'Li Chan'
   description 'This is a plugin for Redmine'
-  version '0.0.1'
+  version '1.0.0'
   url 'https://github.com/conveniencable/redmine_excel_connector'
   author_url 'https://github.com/conveniencable'
 
