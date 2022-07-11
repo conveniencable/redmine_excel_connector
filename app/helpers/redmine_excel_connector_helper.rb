@@ -108,7 +108,7 @@ module RedmineExcelConnectorHelper
       :operatorLabels => Query.operators_labels,
       :operatorByType => Query.operators_by_filter_type,
       :availableFilters => query.available_filters_as_json,
-      :availableColumns => query_selected_inline_columns_options(query) | query_available_inline_columns_options(query),
+      :availableColumns => query_selected_inline_columns_options(query) | query_available_inline_columns_options(query) | [['#', 'id']],
     }
   end
 
