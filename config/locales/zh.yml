@@ -15,3 +15,6 @@ zh:
   confirm_overload: 你对某些问题作了修改但是还未保存，你要放弃这些修改吗？
   error_complete_value: 请完成输入
   error_value_not_available: “%{value}”不是可用值
+  error_excel_column_repeat: 重复
+  error_excel_column_exceed_xfd: 超过最大值XFD
+  excel_title_row: 标题行号

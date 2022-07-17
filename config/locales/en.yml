@@ -15,3 +15,6 @@ en:
   confirm_overload: 'Some Issues have been changed and not saved, are you sure discard your changes?'
   error_complete_value: 'Please complete the input'
   error_value_not_available: '"%{value}" is not an available value'
+  error_excel_column_repeat: Repeat
+  error_excel_column_exceed_xfd: Larger than XFD
+  excel_title_row: Title Row
