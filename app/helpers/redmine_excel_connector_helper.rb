@@ -140,7 +140,7 @@ module RedmineExcelConnectorHelper
     common_fields << { :label => l(:field_total_estimated_hours), :name => 'total_estimated_hours', :type => 'float' }
     common_fields << { :label => l(:label_spent_time), :name => 'spent_hours', :type => 'float', :readonly => true }
     common_fields << { :label => l(:label_total_spent_time), :name => 'total_spent_hours', :type => 'float', :readonly => true }
-    common_fields << { :label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer', :possible_values => (0..10).to_a.collect { |r| { :name => "#{r * 10}%", :id => r * 10 } } }
+    common_fields << { :label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer' }
     common_fields << { :label => l(:label_description), :name => 'description', :type => 'string' }
 
     common_fields << { :label => l(:field_is_private), :name => 'is_private', :type => 'bool', :possible_values => bool_possible_values }
@@ -154,7 +154,7 @@ module RedmineExcelConnectorHelper
     #common_fields << {:name => l(:label_attachment), :name => 'attachment', :type => 'string'}
 
     custom_fields = CustomField.all().map do |cf|
-      { :label => cf.name, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.field_format == 'bool' ? bool_possible_values : cf.possible_values }
+      { :label => cf.name, :multiple => cf.multiple, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.field_format == 'bool' ? bool_possible_values : cf.possible_values }
     end
 
     [common_fields, custom_fields].reduce([], :concat)
@@ -222,11 +222,30 @@ module RedmineExcelConnectorHelper
           value = relation_values
         end
       elsif field_setting[:possible_objects].present?
-        value = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
-        if value
-          value = value[:id]
+        fs = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
+        if fs
+          value = fs[:id]
         else
           return l(:error_value_not_available, field_value)
+        end
+      elsif field_setting[:possible_values].present?
+        if field_setting[:multiple]
+          values = []
+          invalid_values = []
+          field_value.split(', ').each do |v|
+            pv = field_setting[:possible_values].find { |tv| tv == v || tv == v.strip }
+            if pv
+              values << pv unless values.include?(pv)
+            else
+              invalid_values << v
+            end
+          end
+
+          unless invalid_values.empty?
+            return l(:error_value_not_available, invalid_values.join(', '))
+          end
+
+          value = values
         end
       elsif field_setting[:type] == 'bool'
         value = field_value && field_value.strip.downcase == l(:general_text_Yes) ? true : false
@@ -276,7 +295,21 @@ module RedmineExcelConnectorHelper
   end
 
   def parse_oa_date(val)
-    Time.at((val.to_i - 25569) * 24 * 3600)
+    Time.at((val.to_i - 25569) * 24 * 3600).to_date
+  end
+
+  def date_format_ruby()
+    Setting.date_format.blank? ? l('date.format.default') : Setting.date_format
+  end
+
+  def date_format()
+    format = date_format_ruby
+
+    format = format.gsub(/%[dmYbB]/) do
+      {'%d' => 'dd', '%m' => 'mm', '%Y' => 'yyyy', '%b' => 'mmm', '%B' => 'mmmm'}[$&]
+    end
+
+    format
   end
 
   def save_relation(relation_data)
@@ -348,5 +381,25 @@ module RedmineExcelConnectorHelper
     errors[line_no] = [] unless errors[line_no]
 
     errors[line_no] += data
+  end
+
+  def format_issue_value(column, item)
+    value = column.value_object(item)
+    if value.is_a?(Array)
+      value.collect {|v| csv_value(column, item, v)}.compact.join(', ')
+    else
+      value_class_name = value.class.name
+
+      if value_class_name == 'Date'
+        return value.strftime(date_format_ruby)
+      elsif value_class_name == 'CustomValue' or value_class_name == 'CustomFieldValue'
+        if value.custom_field and value.custom_field.field_format == 'date'
+          f = value.custom_field.format.formatted_custom_value(self, value, false)
+          return f.strftime(date_format_ruby)
+        end
+      end
+
+      csv_value(column, item, value)
+    end
   end
 end

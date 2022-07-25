@@ -119,7 +119,7 @@ class RedmineExcelConnectorController < ApplicationController
         issue_data = {:parent_id => issue.parent_id.to_s, :updated_on => issue.updated_on}
         @query.columns.each do |column|
           if column.name != :relations
-            issue_data[column.name] = csv_content(column, issue)
+            issue_data[column.name] = format_issue_value(column, issue)
           end
         end
 
@@ -129,6 +129,7 @@ class RedmineExcelConnectorController < ApplicationController
       end
 
       columnSettings = nil
+      otherSettings = nil
       if @offset == 0
         fields = field_settings
         columnSettings = @query.columns.map do |column|
@@ -141,11 +142,16 @@ class RedmineExcelConnectorController < ApplicationController
             :possible_objects => field ? field[:possible_objects] : nil,
             :type => field ? field[:type] : 'string',
             :read_only => field ? field[:readonly] : false,
+            :multiple => field ? field[:multiple] : false,
             :relation_types => field ? field[:relation_types] : nil
           }
 
           col_data
         end
+
+        otherSettings = {
+          :date_format => date_format
+        }
       end
 
       render :json => json_ok({
@@ -154,6 +160,7 @@ class RedmineExcelConnectorController < ApplicationController
         :total_count => @issue_count,
         :issues => issues_data,
         :columnSettings => columnSettings,
+        :otherSettings => otherSettings,
         :projectId => @project.present? ? @project.id : nil
       })
     else
@@ -167,8 +174,8 @@ class RedmineExcelConnectorController < ApplicationController
 
     deleted_ids = []
     if issue_ids && issue_ids.length > 0
-      exist_ids = Issue.select(:id).find(issue_ids)
-      deleted_ids = issue_ids.select { |v| exist_ids.include? v }
+      exist_ids = Issue.select(:id).where(:id => issue_ids).to_a.map {|s| s.id}
+      deleted_ids = issue_ids.select { |v| !exist_ids.include? v }
     end
 
     render :json => json_ok({
