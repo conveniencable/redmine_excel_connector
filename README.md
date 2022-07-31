@@ -1,5 +1,13 @@
 # redmine_excel_connector
 
+![Redmine Excel Connector](https://conveniencable.github.io/images/after_loaded.png)
+
+
+## Features
+* After login to Redmine on Excel, only operations allowed by current Redmine user permissions are visible or executable.
+* Custom row index for head row and column index for every column to be compatible with various excel template.
+* Filters to load issues to Excel, or just load new changes from Redmine to update the current excel rows, by Redmine ID(#).
+* Save modified issues on Excel to redmine, history for every issue will be generated, same as saving from web.
 
 ## How to install
 * cd your_redmine_installation_dir/plugins
