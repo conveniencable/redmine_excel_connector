@@ -299,7 +299,7 @@ module RedmineExcelConnectorHelper
   end
 
   def date_format_ruby()
-    Setting.date_format.blank? ? l('date.format.default') : Setting.date_format
+    Setting.date_format.blank? ? l('date.formats.default') : Setting.date_format
   end
 
   def date_format()
