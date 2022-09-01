@@ -154,7 +154,19 @@ module RedmineExcelConnectorHelper
     #common_fields << {:name => l(:label_attachment), :name => 'attachment', :type => 'string'}
 
     custom_fields = CustomField.all().map do |cf|
-      { :label => cf.name, :multiple => cf.multiple, :name => "cf_#{cf.id}", :type => cf.field_format == 'list' ? 'string' : cf.field_format, :possible_values => cf.field_format == 'bool' ? bool_possible_values : cf.possible_values }
+      type_str = cf.field_format
+      possible_values = cf.possible_values
+      possible_objects = nil
+
+      if cf.field_format == 'list'
+        type_str = 'string'
+      elsif cf.field_format == 'bool'
+        possible_values = bool_possible_values
+      elsif cf.field_format == 'enumeration'
+        possible_objects = cf.enumerations.all.map { |i| { :id => i.id, :name => i.name } }
+        type_str = 'string'
+      end
+      { :label => cf.name, :multiple => cf.multiple, :name => "cf_#{cf.id}", :type => type_str, :possible_values => possible_values, :possible_objects => possible_objects }
     end
 
     [common_fields, custom_fields].reduce([], :concat)
