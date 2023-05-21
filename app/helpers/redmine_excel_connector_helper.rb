@@ -108,7 +108,7 @@ module RedmineExcelConnectorHelper
       :operatorLabels => Query.operators_labels,
       :operatorByType => Query.operators_by_filter_type,
       :availableFilters => query.available_filters_as_json,
-      :availableColumns => query_selected_inline_columns_options(query) | query_available_inline_columns_options(query) | [['#', 'id']],
+      :availableColumns => query.available_columns.select{ |column| ![:attachments].include?(column.name)}.collect {|column| [column.caption, column.name]},
     }
   end
 
@@ -141,7 +141,7 @@ module RedmineExcelConnectorHelper
     common_fields << { :label => l(:label_spent_time), :name => 'spent_hours', :type => 'float', :readonly => true }
     common_fields << { :label => l(:label_total_spent_time), :name => 'total_spent_hours', :type => 'float', :readonly => true }
     common_fields << { :label => l(:field_done_ratio), :name => 'done_ratio', :type => 'integer' }
-    common_fields << { :label => l(:label_description), :name => 'description', :type => 'string' }
+    common_fields << { :label => l(:field_description), :name => 'description', :type => 'string' }
 
     common_fields << { :label => l(:field_is_private), :name => 'is_private', :type => 'bool', :possible_values => bool_possible_values }
     common_fields << { :label => l(:field_created_on), :name => 'created_on', :type => 'datetime', :readonly => true }
