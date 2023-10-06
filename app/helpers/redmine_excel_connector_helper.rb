@@ -258,6 +258,8 @@ module RedmineExcelConnectorHelper
           end
 
           value = values
+        else
+          value = field_value
         end
       elsif field_setting[:type] == 'bool'
         value = field_value && field_value.strip.downcase == l(:general_text_Yes) ? true : false
