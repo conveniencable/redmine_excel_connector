@@ -125,14 +125,14 @@ module RedmineExcelConnectorHelper
     bool_possible_values = [l(:general_text_Yes), l(:general_text_No)]
     common_fields = []
     common_fields << { :label => '#', :name => 'id', :type => 'integer' }
-    common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :config_objects => Project }
+    common_fields << { :label => l(:field_project), :name => 'project', :key => 'project_id', :type => 'string', :possible_values => Project.all.map { |i| i.name }, :config_objects => Project }
     common_fields << { :label => l(:field_parent_issue), :name => 'parent', :key => 'parent_issue_id', :type => 'string' }
     common_fields << { :label => l(:field_subject), :name => 'subject', :type => 'string' }
-    common_fields << { :label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :config_objects => Tracker }
-    common_fields << { :label => l(:field_status), :name => 'status', :key => 'status_id', :type => 'string', :possible_objects => IssueStatus.all.map { |i| { :id => i.id, :name => i.name } } }
-    common_fields << { :label => l(:field_priority), :name => 'priority', :key => 'priority_id', :type => 'string', :possible_objects => IssuePriority.all.map { |i| { :id => i.id, :name => i.name } } }
+    common_fields << { :label => l(:label_tracker), :name => 'tracker', :key => 'tracker_id', :type => 'string', :possible_values => Tracker.all.map { |i| i.name }, :config_objects => Tracker }
+    common_fields << { :label => l(:field_status), :name => 'status', :key => 'status_id', :type => 'string', :possible_values => IssueStatus.all.map { |i| i.name }, :config_objects => IssueStatus }
+    common_fields << { :label => l(:field_priority), :name => 'priority', :key => 'priority_id', :type => 'string', :possible_values => IssuePriority.all.map { |i| i.name }, :config_objects => IssuePriority }
     common_fields << { :label => l(:field_assigned_to), :name => 'assigned_to', :key => 'assigned_to_id', :type => 'string', :config_objects => User }
-    common_fields << { :label => l(:field_category), :name => 'category', :key => 'category_id', :type => 'string', :config_objects => IssueCategory }
+    common_fields << { :label => l(:field_category), :name => 'category', :key => 'category_id', :type => 'string', :possible_values => IssueCategory.all.map { |i| i.name }, :config_objects => IssueCategory }
 
     common_fields << { :label => l(:field_start_date), :name => 'start_date', :type => 'date' }
     common_fields << { :label => l(:field_due_date), :name => 'due_date', :type => 'date' }
@@ -156,17 +156,21 @@ module RedmineExcelConnectorHelper
     custom_fields = CustomField.all().map do |cf|
       type_str = cf.field_format
       possible_values = cf.possible_values
-      possible_objects = nil
+      config_objects = nil
 
       if cf.field_format == 'list'
         type_str = 'string'
       elsif cf.field_format == 'bool'
         possible_values = bool_possible_values
       elsif cf.field_format == 'enumeration'
-        possible_objects = cf.enumerations.all.map { |i| { :id => i.id, :name => i.name } }
+        possible_values = cf.enumerations.all.map { |i| i.name }
+        config_objects = cf.enumerations
+        type_str = 'string'
+      elsif cf.field_format == 'user'
+        config_objects = User
         type_str = 'string'
       end
-      { :label => cf.name, :multiple => cf.multiple, :name => "cf_#{cf.id}", :type => type_str, :possible_values => possible_values, :possible_objects => possible_objects }
+      { :label => cf.name, :description => cf.description, :multiple => cf.multiple, :name => "cf_#{cf.id}", :type => type_str, :possible_values => possible_values, :config_objects => config_objects }
     end
 
     [common_fields, custom_fields].reduce([], :concat)
@@ -234,12 +238,32 @@ module RedmineExcelConnectorHelper
           value = relation_values
         end
       elsif field_setting[:possible_objects].present?
-        fs = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
-        if fs
-          value = fs[:id]
+        if field_setting[:multiple]
+          values = []
+          invalid_values = []
+          field_value.split(', ').select {|v| v && v.strip}.each do |v|
+            fs = field_setting[:possible_objects].find { |po| po[:name] == v || po[:name] == v.strip }
+            if fs
+              values << fs[:id] unless values.include?(fs[:id])
+            else
+              invalid_values << v
+            end
+          end
+
+          unless invalid_values.empty?
+            return l(:error_value_not_available, invalid_values.join(', '))
+          end
+
+          value = values
         else
-          return l(:error_value_not_available, field_value)
+          fs = field_setting[:possible_objects].find { |po| po[:name] == field_value || po[:name] == field_value.strip }
+          if fs
+            value = fs[:id]
+          else
+            return l(:error_value_not_available, field_value)
+          end
         end
+
       elsif field_setting[:possible_values].present?
         if field_setting[:multiple]
           values = []
@@ -409,7 +433,7 @@ module RedmineExcelConnectorHelper
       elsif value_class_name == 'CustomValue' or value_class_name == 'CustomFieldValue'
         if value.custom_field and value.custom_field.field_format == 'date'
           f = value.custom_field.format.formatted_custom_value(self, value, false)
-          return f.strftime(date_format_ruby)
+          return f.strftime(date_format_ruby) if f
         end
       end
 

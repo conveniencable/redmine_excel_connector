@@ -137,9 +137,9 @@ class RedmineExcelConnectorController < ApplicationController
 
           col_data = {
             :name => column.name,
+            :description => field ? field[:description] : '',
             :label => field ? field[:label] : column.caption,
             :possible_values => field ? field[:possible_values] : nil,
-            :possible_objects => field ? field[:possible_objects] : nil,
             :type => field ? field[:type] : 'string',
             :read_only => field ? field[:readonly] : false,
             :multiple => field ? field[:multiple] : false,
